@@ -1,0 +1,10 @@
+# Lists the currently available models, and provides basic information about each one such as the owner and availability.
+
+get_models_list() {
+	LIST_OF_MODELS=$(curl -s "https://api.openai.com/v1/models" -H "Authorization: Bearer ${API_KEY}" | jq '.data[].id?' | sed 's/"//g')
+}
+
+## Retrieves a model instance, providing basic information about the model such as the owner and permissioning.
+#MODEL_INSTANCE='curl --silent https://api.openai.com/v1/models/${MODEL_NAME} -H "Authorization: Bearer ${API_KEY}"'
+
+#REFERENCE : https://beta.openai.com/docs/api-reference/embeddings

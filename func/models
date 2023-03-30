@@ -1,0 +1,51 @@
+#!/bin/bash
+
+show_models_list() {
+	get_models_list
+	i=0
+	while IFS= read -r line; do
+		echo $line
+	done < <(printf '%s\n' "$LIST_OF_MODELS")
+	exit
+}
+
+select_model() {
+	get_models_list
+	i=0
+	while IFS= read -r line; do
+		i=$(( $i + 1 ));
+		echo "$i - $line"
+	done < <(printf '%s\n' "$LIST_OF_MODELS")
+
+	#k=0
+	#while IFS= read -r line; do
+	#	k=$(( $k + 1 ));
+	#	column_list+=("$k - $line")
+	#done < <(printf '%s\n' "$LIST_OF_MODELS")
+
+	#echo "${column_list[@]}" | column --table -n2
+
+	small_prompt="Select model [1-$i] : "
+	read -p "$small_prompt" CHOSEN_MODEL
+	j=0
+	while IFS= read -r line; do
+		j=$(( $j + 1 ));
+		if [[ $j == ${CHOSEN_MODEL} ]]; then
+			CHOSEN_MODEL=$line
+		fi
+	done < <(printf '%s\n' "${LIST_OF_MODELS}")
+	echo "You chose : ${CHOSEN_MODEL}"
+	MODEL=${CHOSEN_MODEL}
+	if [[ $(grep "ada\|babbage\|curie" <<< "$MODEL") ]]; then
+		if [[ $MAX_TOKENS -gt 2048 ]]; then
+			MAX_TOKENS=2048
+		fi
+	fi
+	create_completion
+	#if [[ ${DEBUG} = true ]]; then
+	#	eval ${DEBUG_CB_FUNC}
+	#	echo "CREATE COMPLETION :"
+	#	eval ${DEBUG_END}
+	#	echo "${CREATE_COMPLETION}"
+	#fi
+}

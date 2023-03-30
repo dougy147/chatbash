@@ -1,0 +1,16 @@
+# Given a prompt and an instruction, the model will return an edited version of the prompt.
+
+## Create an edit : Creates a new edit for the provided input, instruction, and parameters
+#CREATE_EDIT="curl https://api.openai.com/v1/edits \
+#  -H 'Content-Type: application/json' \
+#  -H 'Authorization: Bearer ${API_KEY}' \
+#  -d '{
+#  \"model\": \"${MODEL}\",
+#  \"input\": \"${USER_PROMPT}\", # The input text to use as a starting point for the edit.
+#  \"instruction\": \"${USER_INSTRUCTIONS}\", # The instruction that tells the model how to edit the prompt.
+#  \"n\": \"${EDITS_NUMBER}\", # facultative : How many edits to generate for the input and instruction.
+#  \"top_p\": \"${TOP_P}\", # facultative : An alternative to sampling with temperature, called nucleus sampling, where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. We generally recommend altering this or temperature but not both.
+#  \"temperature\": \"${TEMPERATURE}\", # facultative : What sampling temperature to use. Higher values means the model will take more risks. Try 0.9 for more creative applications, and 0 (argmax sampling) for ones with a well-defined answer. We generally recommend altering this or top_p but not both.
+#}'"
+#
+##REFERENCE : https://beta.openai.com/docs/api-reference/embeddings

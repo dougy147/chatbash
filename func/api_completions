@@ -1,0 +1,36 @@
+#!/bin/bash
+# Completions : given a prompt, the model will return one or more predicted completions, and can also return the probabilities of alternative tokens at each position.
+
+# Create completion
+create_completion() {
+	URL="https://api.openai.com/v1/completions"
+	REQUEST_HEADERS=$(echo "{\"model\": \"${MODEL}\", \
+		\"prompt\": \"${USER_PROMPT_TRANSFORMED}\", \
+		\"temperature\": ${TEMPERATURE}, \
+		\"max_tokens\": ${MAX_TOKENS}}" | sed 's/\t//g')
+
+	#TODO : add others options if provided (SUFFIX, etc)
+	#CREATE_COMPLETION="curl https://api.openai.com/v1/completions \
+	#  -H \"Content-Type: application/json\" \
+	#  -H \"Authorization: Bearer ${API_KEY}\" \
+	#  -d \"{
+	#  \"model\": \"${MODEL}\",
+	#  \"prompt\": \"${USER_PROMPT}\",
+	#  \"max_tokens\": ${MAX_TOKENS},
+	#  \"temperature\": ${TEMPERATURE},
+	#  \"suffix\": \"${SUFFIX}\",
+	#  \"top_p\": ${TOP_P},
+	#  \"n\": ${N_COMPLETIONS},
+	#  \"stream\": ${STREAM},
+	#  \"logprobs\": ${LOGPROBS},
+	#  \"echo\": ${ECHO},
+	#  \"stop\": \"${STOP}\",
+	#  \"presence_penalty\": ${PRESENCE_PENALTY},
+	#  \"frequency_penalty\": ${FREQUENCY_PENALTY},
+	#  \"best_of\": ${BEST_OF},
+	#  \"logit_bias\": \"${LOGIT_BIAS}\",
+	#  \"user\": ${USER_ID},
+	#  }\""
+}
+
+#REFERENCE : https://beta.openai.com/docs/api-reference/embeddings

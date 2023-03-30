@@ -1,0 +1,16 @@
+#!/bin/bash
+
+save_history() {
+	if [[ "$HISTORY" != "false" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "Saving history."
+			eval ${DEBUG_END}
+		fi
+		echo -e "####\n# $(date)
+			Input : ${USER_PROMPT}
+			Input (URL format) : ${USER_PROMPT_TRANSFORMED}" >> "${HIST_FILE}"
+		cat "${LAST_ANSWER_FILE}" >> "${HIST_FILE}"
+		echo "" >> "${HIST_FILE}"
+	fi
+}

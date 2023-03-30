@@ -1,0 +1,34 @@
+#!/bin/bash
+
+check_api() {
+	if [[ $(curl --silent "https://api.openai.com/v1/models" \
+		-H "Authorization: Bearer ${API_KEY}" \
+		-H "OpenAI-Organization: ${ORGANIZATION_TOKEN}" | \
+		grep -o "Invalid\|Incorrect") ]]; then
+			if [[ ${DEBUG} = true ]]; then
+				eval ${DEBUG_CB_FUNC}
+				eval ${DEBUG_END}
+			fi
+			if [ -z $first_api_try ]; then
+				first_api_try=true
+				not_valid_api
+			else
+				echo -ne "${_R}API not valid.${_RST}"
+				unset first_api_try
+				exit 1
+			fi
+	elif [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "API key is valid"
+		eval ${DEBUG_END}
+	fi
+}
+
+not_valid_api() {
+	read -p "Please provide an API key : " -s API_KEY
+	API_KEY=$(echo $API_KEY | sed 's/"//g')
+	check_api
+	sed -i "s/^API_KEY=.*/API_KEY=\"${API_KEY}\"/" "${CONF_FILE}"
+	unset first_api_try
+	echo -e "\n"
+}

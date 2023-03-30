@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Send request and receive answer.
+make_request() {
+
+	if [[ -z "${URL}" ]]; then
+		URL="https://api.openai.com/v1/completions"
+	fi
+
+	if [[ -n "${DEBUG}" ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "Will return unformated answer"
+		#ANSWER=$(curl -s https://api.openai.com/v1/completions \
+		ANSWER=$(curl -s "${URL}" \
+			-H "Content-Type: application/json" \
+			-H "Authorization: Bearer ${API_KEY}" \
+			-d "${REQUEST_HEADERS}" | tee "${LAST_ANSWER_FILE}")
+		eval ${DEBUG_END}
+
+		if [[ -n "$USER_IMAGE" ]]; then
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | tee "${LAST_ANSWER_FILE}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+		fi
+	else
+		#ANSWER=$(curl -s https://api.openai.com/v1/completions \
+		if [[ -n "$USER_IMAGE" ]]; then
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+			#ANSWER=$(curl -s "${URL}" \
+			#	-H "Content-Type: application/json" \
+			#	-H "Authorization: Bearer ${API_KEY}" \
+			#	-d "${REQUEST_HEADERS}")
+			#echo $ANSWER && exit	# | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+			##	#-d "${REQUEST_HEADERS}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image.png")
+		else
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | jq -r '.choices[0] .text' | \
+				sed '0,/^[[:space:]]*$/{//d}' | \
+				sed '0,/^[[:space:]]*$/{//d}' | tee "${LAST_ANSWER_FILE}")
+		fi
+	fi
+}

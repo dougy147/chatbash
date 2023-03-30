@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Print ChatGPT answer to stdout.
+print_answer() {
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "Outputing ChatGPT answer :"
+		eval ${DEBUG_END}
+	fi
+
+	if [[ -z "$USER_IMAGE" ]]; then
+		if [[ -n $AUDIO ]]; then
+			audio_answer &>/dev/null
+		fi
+
+		if [[ "$TYPEWRITER" == "true" ]]; then
+			typewriter_mode "$ANSWER"
+		else
+			echo $ANSWER
+		fi
+	else
+		IMG_NAME=$(echo $USER_PROMPT | sed 's/\ /-/g')$(echo $(date '+%s').png)
+		curl -s "$(cat $HIST_DIR/image_url.txt)" > "$HIST_DIR/$IMG_NAME"
+		#sxiv "$HIST_DIR/$IMG_NAME"
+		xdg-open "$HIST_DIR/$IMG_NAME"
+	fi
+
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "End of answer."
+		eval ${DEBUG_END}
+	fi
+}
+
+typewriter_mode() {
+	for (( i=0;i<${#1};i++ )); do
+		echo -en "${1:$i:1}"
+		sleep 0.02
+	done
+}
+
+audio_answer() {
+	tmp_dir=$(mktemp -d)
+	pico2wave --lang="${CB_LANG}" -w "$tmp_dir"/out.wav "$ANSWER" && aplay "$tmp_dir"/out.wav & 2>/dev/null
+	#espeak "$ANSWER" -v fr & #>/dev/null 2>&1
+}

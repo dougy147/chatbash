@@ -1,0 +1,342 @@
+#!/bin/bash
+CONF_DEST="${HOME}/.config/chatbash"
+CONF_FILE="${CONF_DEST}/chatbash.conf"
+source "${CONF_FILE}"
+_RED="tput setaf 1"
+_GREEN="tput setaf 2"
+_YELLOW="tput setaf 3"
+_BLUE="tput setaf 4"
+_MAGENTA="tput setaf 5"
+_CYAN="tput setaf 6"
+_WHITE="tput setaf 7"
+_RESET="tput sgr0"
+_BOLD="tput bold"
+_ULINE="\e[4m"
+_DEL="\e[1A\e[K"
+_R="$(tput setaf 1)"
+_G="$(tput setaf 2)"
+_Y="$(tput setaf 3)"
+_B="$(tput setaf 4)"
+_M="$(tput setaf 5)"
+_C="$(tput setaf 6)"
+_W="$(tput setaf 7)"
+_RST="$(tput sgr0)"
+_BLD="$(tput bold)"
+print_answer() {
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "Outputing ChatGPT answer :"
+		eval ${DEBUG_END}
+	fi
+	if [[ -z "$USER_IMAGE" ]]; then
+		if [[ -n $AUDIO ]]; then
+			audio_answer &>/dev/null
+		fi
+		if [[ "$TYPEWRITER" == "true" ]]; then
+			typewriter_mode "$ANSWER"
+		else
+			echo $ANSWER
+		fi
+	else
+		IMG_NAME=$(echo $USER_PROMPT | sed 's/\ /-/g')$(echo $(date '+%s').png)
+		curl -s "$(cat $HIST_DIR/image_url.txt)" > "$HIST_DIR/$IMG_NAME"
+		sxiv "$HIST_DIR/$IMG_NAME"
+	fi
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "End of answer."
+		eval ${DEBUG_END}
+	fi
+}
+typewriter_mode() {
+	for (( i=0;i<${#1};i++ )); do
+		echo -en "${1:$i:1}"
+		sleep 0.02
+	done
+}
+audio_answer() {
+	tmp_dir=$(mktemp -d)
+	pico2wave --lang="${CB_LANG}" -w "$tmp_dir"/out.wav "$ANSWER" && aplay "$tmp_dir"/out.wav & 2>/dev/null
+}
+create_completion() {
+	URL="https://api.openai.com/v1/completions"
+	REQUEST_HEADERS=$(echo "{\"model\": \"${MODEL}\", \
+		\"prompt\": \"${USER_PROMPT_TRANSFORMED}\", \
+		\"temperature\": ${TEMPERATURE}, \
+		\"max_tokens\": ${MAX_TOKENS}}" | sed 's/\t//g')
+}
+create_image() {
+	URL="https://api.openai.com/v1/images/generations"
+	SIZE="512x512"
+	REQUEST_HEADERS=$(echo "{\"prompt\": \"${USER_PROMPT_TRANSFORMED}\", \
+		\"size\": \"${SIZE}\"}" | sed 's/\t//g')
+}
+get_models_list() {
+	LIST_OF_MODELS=$(curl -s "https://api.openai.com/v1/models" -H "Authorization: Bearer ${API_KEY}" | jq '.data[].id?' | sed 's/"//g')
+}
+check_api() {
+	if [[ $(curl --silent "https://api.openai.com/v1/models" \
+		-H "Authorization: Bearer ${API_KEY}" \
+		-H "OpenAI-Organization: ${ORGANIZATION_TOKEN}" | \
+		grep -o "Invalid\|Incorrect") ]]; then
+			if [[ ${DEBUG} = true ]]; then
+				eval ${DEBUG_CB_FUNC}
+				eval ${DEBUG_END}
+			fi
+			if [ -z $first_api_try ]; then
+				first_api_try=true
+				not_valid_api
+			else
+				echo -ne "${_R}API not valid.${_RST}"
+				unset first_api_try
+				exit 1
+			fi
+	elif [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "API key is valid"
+		eval ${DEBUG_END}
+	fi
+}
+not_valid_api() {
+	read -p "Please provide an API key : " -s API_KEY
+	API_KEY=$(echo $API_KEY | sed 's/"//g')
+	check_api
+	sed -i "s/^API_KEY=.*/API_KEY=\"${API_KEY}\"/" "${CONF_FILE}"
+	unset first_api_try
+	echo -e "\n"
+}
+check_args() {
+	args=("$@")
+	args_number=${#args[@]}
+	for (( i=0;i<$args_number;i++)); do
+		CURRENT_ARG=$(echo ${args[${i}]})
+		if [[ -f $CURRENT_ARG ]]; then
+			FILE_GIVEN=true
+			FILE_TO_READ=$CURRENT_ARG
+		fi
+		case "$CURRENT_ARG" in
+			"--debug")
+				debug_on ;;
+			"--image")
+				USER_IMAGE=true ;;
+			"--list-models")
+				#SELECT_MODEL=true ;;
+				show_models_list;;
+			"--hist=off")
+				HISTORY=false ;;
+			"--hist=on")
+				HISTORY=true ;;
+			"--select-model")
+				USER_SELECT_MODEL=true ;;
+				#select_model;;
+			"--type-writer=on")
+				TYPEWRITER=true ;;
+			"--type-writer=off")
+				TYPEWRITER=false ;;
+			--audio*)
+				AUDIO=true
+				if [[ $(echo "$CURRENT_ARG" | grep -Po -- '--audio=\K.*') ]]; then
+					CB_LANG=$(echo "$CURRENT_ARG" | grep -Po -- '--audio=\K.*')
+					case "$CB_LANG" in
+						"de")
+							CB_LANG="de-DE";;
+						"en")
+							CB_LANG="en-GB";;
+						"es")
+							CB_LANG="es-ES";;
+						"fr")
+							CB_LANG="fr-FR";;
+						"it")
+							CB_LANG="it-IT";;
+						"us")
+							CB_LANG="en-US";;
+					esac
+				fi ;;
+			*)
+				PROMPT_IN_ARG+=("$CURRENT_ARG") ;;
+		esac
+	done
+	if [[ -n $PROMPT_IN_ARG ]]; then
+		printf -v USER_PROMPT "%s " "${PROMPT_IN_ARG[@]}"
+		USER_PROMPT="${USER_PROMPT%?}"
+	fi
+	if [[ -n "$GET_MODELS_LIST" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "User asked for models list."
+			eval ${DEBUG_END}
+		fi
+		show_models_list
+		exit 0
+	fi
+	if [[ -n "$USER_PROMPT" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "Prompt provided in the arguments: ${USER_PROMPT}"
+			eval ${DEBUG_END}
+		fi
+		encode_user_prompt
+	elif [[ -n "$FILE_GIVEN" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "Reading the file $FILE_TO_READ as input."
+			eval ${DEBUG_END}
+		fi
+		USER_PROMPT=$(cat "$FILE_TO_READ")
+		encode_user_prompt
+	else
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "No input given. Asking user with prompt."
+			eval ${DEBUG_END}
+		fi
+		tput bold
+		#read -p "> " -e -d '' USER_PROMPT
+		read -p "> " USER_PROMPT
+		tput sgr0
+		encode_user_prompt
+	fi
+	if [[ -n "$USER_SELECT_MODEL" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "User asked to select a model."
+			eval ${DEBUG_END}
+		fi
+		select_model
+	fi
+}
+debug_on() {
+	DEBUG=true
+	DEBUG_CB_FUNC="${_RED} && echo chatbash function : \${FUNCNAME[0]}"
+	DEBUG_API_FUNC="${_RED} && echo api function : \${FUNCNAME[0]}"
+	DEBUG_END="${_RESET} && echo ''"
+	eval ${DEBUG_CB_FUNC}
+	echo "Debug mode = true"
+	eval ${DEBUG_END}
+}
+encode_user_prompt() {
+	USER_PROMPT_TRANSFORMED=$(jq -rn --arg x "${USER_PROMPT}" '$x|@uri')
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo -e "USER_PROMPT_TRANSFORMED = ${USER_PROMPT_TRANSFORMED}\n"
+		eval ${DEBUG_END}
+	fi
+	}
+save_history() {
+	if [[ "$HISTORY" != "false" ]]; then
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo "Saving history."
+			eval ${DEBUG_END}
+		fi
+		echo -e "####\n# $(date)
+			Input : ${USER_PROMPT}
+			Input (URL format) : ${USER_PROMPT_TRANSFORMED}" >> "${HIST_FILE}"
+		cat "${LAST_ANSWER_FILE}" >> "${HIST_FILE}"
+		echo "" >> "${HIST_FILE}"
+	fi
+}
+show_models_list() {
+	get_models_list
+	i=0
+	while IFS= read -r line; do
+		echo $line
+	done < <(printf '%s\n' "$LIST_OF_MODELS")
+	exit
+}
+select_model() {
+	get_models_list
+	i=0
+	while IFS= read -r line; do
+		i=$(( $i + 1 ));
+		echo "$i - $line"
+	done < <(printf '%s\n' "$LIST_OF_MODELS")
+	small_prompt="Select model [1-$i] : "
+	read -p "$small_prompt" CHOSEN_MODEL
+	j=0
+	while IFS= read -r line; do
+		j=$(( $j + 1 ));
+		if [[ $j == ${CHOSEN_MODEL} ]]; then
+			CHOSEN_MODEL=$line
+		fi
+	done < <(printf '%s\n' "${LIST_OF_MODELS}")
+	echo "You chose : ${CHOSEN_MODEL}"
+	MODEL=${CHOSEN_MODEL}
+	if [[ $(grep "ada\|babbage\|curie" <<< "$MODEL") ]]; then
+		if [[ $MAX_TOKENS -gt 2048 ]]; then
+			MAX_TOKENS=2048
+		fi
+	fi
+	create_completion
+}
+make_request() {
+	if [[ -z "${URL}" ]]; then
+		URL="https://api.openai.com/v1/completions"
+	fi
+	if [[ -n "${DEBUG}" ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo "Will return unformated answer"
+		#ANSWER=$(curl -s https://api.openai.com/v1/completions \
+		ANSWER=$(curl -s "${URL}" \
+			-H "Content-Type: application/json" \
+			-H "Authorization: Bearer ${API_KEY}" \
+			-d "${REQUEST_HEADERS}" | tee "${LAST_ANSWER_FILE}")
+		eval ${DEBUG_END}
+		if [[ -n "$USER_IMAGE" ]]; then
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | tee "${LAST_ANSWER_FILE}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+		fi
+	else
+		#ANSWER=$(curl -s https://api.openai.com/v1/completions \
+		if [[ -n "$USER_IMAGE" ]]; then
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+			#ANSWER=$(curl -s "${URL}" \
+			#	-H "Content-Type: application/json" \
+			#	-H "Authorization: Bearer ${API_KEY}" \
+			#	-d "${REQUEST_HEADERS}")
+			#echo $ANSWER && exit	# | jq -r '.data[0] .url' | tee "$HIST_DIR/image_url.txt")
+			##	#-d "${REQUEST_HEADERS}" | jq -r '.data[0] .url' | tee "$HIST_DIR/image.png")
+		else
+			ANSWER=$(curl -s "${URL}" \
+				-H "Content-Type: application/json" \
+				-H "Authorization: Bearer ${API_KEY}" \
+				-d "${REQUEST_HEADERS}" | jq -r '.choices[0] .text' | \
+				sed '0,/^[[:space:]]*$/{//d}' | \
+				sed '0,/^[[:space:]]*$/{//d}' | tee "${LAST_ANSWER_FILE}")
+		fi
+	fi
+}
+set_request_headers() {
+	if [[ -z "$REQUEST_HEADERS" ]]; then
+		if [[ -z $USER_IMAGE ]]; then
+			REQUEST_HEADERS=$(echo "{\"model\": \"${MODEL}\", \
+				\"prompt\": \"${USER_PROMPT_TRANSFORMED}\", \
+				\"temperature\": ${TEMPERATURE}, \
+				\"max_tokens\": ${MAX_TOKENS}}" | sed 's/\t//g')
+		else
+			create_image
+		fi
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo -e "Request headers : ${REQUEST_HEADERS}"
+			eval ${DEBUG_END}
+		fi
+	else
+		if [[ ${DEBUG} = true ]]; then
+			eval ${DEBUG_CB_FUNC}
+			echo -e "Request headers ALREADY DEFINED : ${REQUEST_HEADERS}"
+			eval ${DEBUG_END}
+		fi
+	fi
+}
+check_api
+check_args "$@"
+set_request_headers
+make_request
+print_answer
+save_history

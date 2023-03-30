@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Encode USER_PROMPT to URL format (avoid special characters break)
+encode_user_prompt() {
+	#USER_PROMPT_TRANSFORMED=$(echo "${USER_PROMPT}" | rawurlencode | sed 's/%0a$//')
+	USER_PROMPT_TRANSFORMED=$(jq -rn --arg x "${USER_PROMPT}" '$x|@uri')
+	if [[ ${DEBUG} = true ]]; then
+		eval ${DEBUG_CB_FUNC}
+		echo -e "USER_PROMPT_TRANSFORMED = ${USER_PROMPT_TRANSFORMED}\n"
+		eval ${DEBUG_END}
+	fi
+	}
+
+#rawurlencode() {
+#	local LANG=C
+#	local IFS=
+#	while read -n1 -r -d "$(echo -n "\000")" c; do
+#		case	"$c" in [öôçëêéèà+-_.~a-zA-Z0-9]) echo -n "$c" ;;
+#		#case	"$c" in [êéèà+-_.~a-zA-Z0-9]) echo -n "$c" ;;
+#			*) printf '%%%02x' "'$c" ;;
+#		esac
+#	done
+#}
